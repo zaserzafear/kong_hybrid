@@ -31,7 +31,7 @@ services:
   # Kong: database migration
   #######################################
   kong_cp_migration:
-    image: kong:2.6
+    image: kong:2.8
     depends_on:
       - kong_database
     command: kong migrations bootstrap
@@ -47,25 +47,24 @@ services:
   #######################################
   # Kong gen cert
   #######################################
-  # kong_gen_cert:
-  #   image: kong:2.6
-  #   depends_on:
-  #     - kong_cp_migration
-  #   command: kong hybrid gen_cert --v
-  #   working_dir: /certs
-  #   volumes:
-  #     - ./kong-certs:/certs:rw
-  #   environment:
-  #     - TZ=Asia/Bangkok
+  kong_gen_cert:
+    image: kong:2.8
+    depends_on:
+      - kong_cp_migration
+    command: kong hybrid gen_cert --v
+    working_dir: /certs
+    volumes:
+      - ./kong-certs:/certs:rw
+    environment:
+      - TZ=Asia/Bangkok
   #
   #######################################
   # Kong: The API Gateway
   #######################################
   kong_cp:
-    image: kong:2.6
+    image: kong:2.8
     depends_on:
       - kong_cp_migration
-      # - kong_gen_cert
     restart: always
     volumes:
       - ./kong-certs:/certs:ro
@@ -94,7 +93,7 @@ services:
       - kong-network
   #
   kong_dp:
-    image: kong:2.6
+    image: kong:2.8
     depends_on:
       - kong_cp
     restart: always
@@ -122,3 +121,50 @@ services:
     networks:
       - default
       - kong-proxy
+  #
+  #######################################
+  # PostgreSql: The database used by Konga
+  #######################################
+  konga_database:
+    image: postgres:9.6-alpine
+    restart: always
+    volumes:
+      - ./postgres/konga_database:/var/lib/postgresql/data
+    environment:
+      TZ: Asia/Bangkok
+      POSTGRES_DB: konga
+      POSTGRES_USER: konga
+      POSTGRES_PASSWORD: konga
+      POSTGRES_HOST_AUTH_METHOD: trust
+  #
+  #######################################
+  # Konga database prepare
+  #######################################
+  konga_prepare:
+    image: pantsel/konga:latest
+    depends_on:
+      - konga_database
+    restart: on-failure
+    command: "-c prepare -a postgres -u
+      postgresql://konga:konga@konga_database/konga"
+    environment:
+      TZ: Asia/Bangkok
+  #
+  #######################################
+  # Konga: Kong GUI
+  #######################################
+  konga:
+    image: pantsel/konga:latest
+    depends_on:
+      - konga_prepare
+    restart: always
+    environment:
+      TZ: Asia/Bangkok
+      NODE_ENV: production
+      DB_ADAPTER: postgres
+      DB_URI: postgresql://konga:konga@konga_database/konga
+    ports:
+      - 1337:1337
+    networks:
+      - default
+      - kong-network
