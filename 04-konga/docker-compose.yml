@@ -1,0 +1,31 @@
+version: "3"
+networks:
+  default:
+    external:
+      name: kong-network
+
+services:
+  konga-database:
+    image: mongo:5
+    restart: always
+    volumes:
+      - ./konga/database:/data/db
+    env_file:
+      - .env
+    ports:
+      - 27017:27017 # mongodb://localhost:27017
+
+  konga:
+    image: pantsel/konga:latest
+    depends_on:
+      - konga-database
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+
+      DB_ADAPTER: mongo
+      DB_HOST: konga-database
+    ports:
+      - 1337:1337

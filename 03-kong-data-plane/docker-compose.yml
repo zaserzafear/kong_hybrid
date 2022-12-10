@@ -1,0 +1,38 @@
+version: "3"
+networks:
+  default:
+    external:
+      name: kong-network
+  kong-proxy:
+    external:
+      name: kong-proxy
+
+services:
+  kong-dp:
+    image: kong:2.8
+    restart: on-failure
+    volumes:
+      - ./kong/cert:/certs:ro
+    env_file:
+      - .env
+    environment:
+      KONG_NGINX_HTTP_LOG_FORMAT: |
+        custom_format escape=none '{"time": "$$time_local", "remote_user": "$$remote_user", "remote_addr": "$$remote_addr", "http_x_forwarded_for": "$$http_x_forwarded_for", "server_name": "$$server_name", "upstream_addr": "$$upstream_addr", "status": "$$status", "request_time": "$$request_time", "scheme": "$$scheme", "http_host": "$$http_host", "request": "$$request", "body_bytes_sent": "$$body_bytes_sent", "http_referer": "$$http_referer", "http_user_agent": "$$http_user_agent", "request_body": "$$request_body"}'
+      KONG_PROXY_ACCESS_LOG: "/dev/stdout custom_format"
+      KONG_PROXY_ERROR_LOG: "/dev/stderr"
+
+      KONG_PROXY_LISTEN: 0.0.0.0:8000, 0.0.0.0:8443 ssl
+      KONG_STATUS_LISTEN: 0.0.0.0:9123
+
+      KONG_DATABASE: "off"
+      KONG_ROLE: data_plane
+      KONG_CLUSTER_CONTROL_PLANE: kong-cp:8005
+      KONG_CLUSTER_CERT: /certs/cluster.crt
+      KONG_CLUSTER_CERT_KEY: /certs/cluster.key
+      KONG_LUA_SSL_TRUSTED_CERTIFICATE: /certs/cluster.crt
+    networks:
+      - default
+      - kong-proxy
+    ports:
+      - 8000:8000
+      - 8443:8443
